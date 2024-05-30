@@ -117,6 +117,7 @@ def extract_paycheck_id(text):
 
 
 async def main():
+    print("Starting bot")
     await dp.start_polling(bot)
 
 
