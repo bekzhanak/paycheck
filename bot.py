@@ -46,7 +46,7 @@ admins = load_json('admins.json')
 @dp.message(CommandStart())
 async def send_welcome(message: Message, state: FSMContext):
     print(f"{message.from_user.username} started")
-    await message.reply("Қощ келдіңіз, чекті жіберіңіз.")
+    await message.reply("Қош келдіңіз, чекті жіберіңіз.")
     await state.set_state(Form.waiting_for_pdf)
 
 
