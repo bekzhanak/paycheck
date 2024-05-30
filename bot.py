@@ -1,6 +1,7 @@
 import os
 import json
 import asyncio
+import pandas as pd
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import Message
 from aiogram.filters import CommandStart, Command
@@ -105,10 +106,22 @@ async def process_password(message: types.Message, state: FSMContext):
 
 async def send_whitelist(message: types.Message):
     print(f"Sending whitelist to {message.from_user.username}")
-    whitelist_text = ""
-    for user in whitelist.keys():
-        whitelist_text += "@" + user + "\n"
-    await message.reply(f"Уайтлист қолданушылар:\n{whitelist_text}")
+    await generate_and_send_whitelist_excel(message)
+
+
+async def generate_and_send_whitelist_excel(message: types.Message):
+    # Create a DataFrame from the whitelist
+    df = pd.DataFrame(list(whitelist.keys()), columns=["Username"])
+
+    # Save the DataFrame to an Excel file
+    file_path = "whitelist.xlsx"
+    df.to_excel(file_path, index=False)
+
+    # Send the Excel file
+    await bot.send_document(message.chat.id, types.InputFile(file_path))
+
+    # Remove the file after sending
+    os.remove(file_path)
 
 
 def extract_paycheck_id(text):
