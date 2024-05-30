@@ -8,6 +8,8 @@ from aiogram.filters import CommandStart, Command
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 from dotenv import load_dotenv
+from PIL import Image
+import pytesseract
 
 # Load environment variables
 load_dotenv()
@@ -54,22 +56,42 @@ async def send_welcome(message: Message, state: FSMContext):
 # Handle receiving PDF
 @dp.message(Form.waiting_for_pdf)
 async def handle_pdf(message: types.Message, state: FSMContext):
-    if not message.document or message.document.mime_type != 'application/pdf':
+    if message.content_type == types.ContentType.PHOTO:
+        await handle_photo(message, state)
+    elif message.document.mime_type == 'application/pdf':
+        # Download the PDF file
+        file_name = message.document.file_name
+
+        if file_name[0:18] != "transfer-receipt-№":
+            await message.reply("Чекті жіберіңіз.")
+            return
+
+        # Assume paycheck ID is in the text and parse it
+        paycheck_id = extract_paycheck_id(file_name)  # Implement this function as needed
+        await process_paycheck_id(message, paycheck_id, state)
+    else:
         await message.reply("Чекті жіберіңіз.")
         return
 
-    # Download the PDF file
-    file_name = message.document.file_name
 
-    if file_name[0:18] != "transfer-receipt-№":
-        await message.reply("Чекті жіберіңіз.")
-        return
+async def handle_photo(message: types.Message, state: FSMContext):
+    file_id = message.photo[-1].file_id
+    file = await bot.get_file(file_id)
+    file_path = file.file_path
+    await bot.download_file(file_path, 'paycheck.jpg')
 
-    # Assume paycheck ID is in the text and parse it
-    paycheck_id = extract_paycheck_id(file_name)  # Implement this function as needed
+    image = Image.open('paycheck.jpg')
+    text = pytesseract.image_to_string(image)
+    os.remove('paycheck.jpg')
 
+    paycheck_id = extract_paycheck_id_from_photo(text)
+    await process_paycheck_id(message, paycheck_id, state)
+
+
+async def process_paycheck_id(message, paycheck_id, state):
     if paycheck_id in paycheck_ids:
         await message.reply("Бұл чек уже жіберілген")
+        return
     else:
         print(f"Paycheck {paycheck_id} added")
         paycheck_ids[paycheck_id] = message.from_user.username
@@ -79,6 +101,18 @@ async def handle_pdf(message: types.Message, state: FSMContext):
         await message.reply("Чекіңіз расталды")
 
     await state.clear()
+
+
+def extract_paycheck_id_from_photo(text):
+    # Implement the logic to extract the paycheck ID from the text
+    # Example logic: Find the first occurrence of "QR" followed by digits
+    import re
+    pattern = r'QR\d+'
+
+    # Search for the pattern in the text
+    match = re.search(pattern, text)
+
+    return str(match.group(0))[1::]
 
 
 # Handle admin password and send whitelist
@@ -118,14 +152,14 @@ async def generate_and_send_whitelist_excel(message: types.Message):
     df.to_excel(file_path, index=False)
 
     # Send the Excel file
-    await bot.send_document(message.chat.id, types.InputFile(file_path))
+    await bot.send_document(message.chat.id, types.FSInputFile(file_path))
 
     # Remove the file after sending
     os.remove(file_path)
 
 
 def extract_paycheck_id(text):
-    text = text[18::]
+    text = text[21::]
     return text[:-4:]
 
 
