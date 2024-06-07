@@ -5,7 +5,6 @@ import requests
 import PyPDF2
 from bs4 import BeautifulSoup
 from pdf2image import convert_from_path
-from qreader import QReader
 import cv2
 from aiogram import types
 import pandas as pd
@@ -114,13 +113,28 @@ def extract_qr_code_from_pdf(pdf_path):
     # Convert PDF to images
     images = convert_from_path(pdf_path)
 
+    # Initialize QR Code detector
+    qcd = cv2.QRCodeDetector()
+
     for image in images:
-        qreader = QReader()
-        image.save("check.jpg")
-        image = cv2.cvtColor(cv2.imread("check.jpg"), cv2.COLOR_BGR2RGB)
-        decoded_text = qreader.detect_and_decode(image=image)
-        os.remove("check.jpg")
-        return decoded_text[0]
+        # Save image temporarily to disk
+        temp_image_path = "temp_image.jpg"
+        image.save(temp_image_path)
+
+        # Read the saved image
+        image = cv2.imread(temp_image_path)
+
+        # Detect and decode QR codes
+        ret_qr, decoded_info, points, _ = qcd.detectAndDecodeMulti(image)
+
+        # Remove the temporary image file
+        os.remove(temp_image_path)
+
+        # Return the first decoded text if found
+        if ret_qr:
+            for info in decoded_info:
+                if info:
+                    return info
 
     return None
 
